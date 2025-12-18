@@ -53,10 +53,10 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
   const [trailState, setTrailState] = useState({ visible: false, id: 0 })
 
   // --- Path Calculations ---
-  // Start: Left side (Reverted)
-  const startPos = useMemo(() => new THREE.Vector3(-viewport.width / 2 - 2, viewport.height / 4, 0), [viewport])
+  // Start: Positioned roughly behind "Available for work" (Left column, slightly below center)
+  const startPos = useMemo(() => new THREE.Vector3(-viewport.width / 3.2, -0.5, 0), [viewport])
   const endPos = useMemo(() => new THREE.Vector3(0, 0, 0), [])
-  const controlPos = useMemo(() => new THREE.Vector3(-viewport.width / 4, -2, 1), [viewport])
+  const controlPos = useMemo(() => new THREE.Vector3(-viewport.width / 8, -2, 2), [viewport])
 
   useFrame((_, delta) => {
     if (!group.current) return
@@ -69,28 +69,46 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
         
         if (s.timer <= 0) {
             s.phase = 'spawning'
-            s.warmup = 0 // Initialize warmup counter
+            s.warmup = 0 
+            s.progress = 0
             
             // Hard Reset Position
             group.current.position.copy(startPos)
             group.current.updateMatrixWorld(true)
             group.current.visible = true
+            
+            // Reset opacity to 0 to hide any initial frame glitches
+            if (meshRef.current) {
+                (meshRef.current.material as THREE.Material).opacity = 0;
+            }
         }
     } 
     else if (s.phase === 'spawning') {
-        // Force Position Hold for 5 frames to guarantee stability
         group.current.position.copy(startPos)
         group.current.updateMatrixWorld(true)
         
         s.warmup += 1
+        // Increased warmup slightly more to be absolutely safe
         if (s.warmup > 5) {
             s.phase = 'active'
             s.progress = 0
             setTrailState(prev => ({ visible: true, id: prev.id + 1 })) 
+            
+            // Fade in opacity starting now
+            s.timer = 0 // use timer for fading in
         }
     }
     else if (s.phase === 'active') {
         s.progress += delta * (SPEED * 0.5) 
+        
+        // Fade in logic: Linear fade from 0 to 1 over first 0.5s
+        if (s.timer < 1) {
+            s.timer += delta * 2
+            const opacity = Math.min(s.timer, 1)
+            if (meshRef.current) {
+                (meshRef.current.material as THREE.Material).opacity = opacity * 0.8;
+            }
+        }
         
         const t = s.progress
         const invT = 1 - t
@@ -107,7 +125,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
         }
     }
     else if (s.phase === 'impacting') {
-        setTrailState(prev => ({ ...prev, visible: false })) // Cut trail
+        setTrailState(prev => ({ ...prev, visible: false })) 
         s.phase = 'waiting'
         s.timer = START_DELAY + Math.random() 
     }
@@ -118,7 +136,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
         {/* Tail Component */}
         {trailState.visible && (
             <Trail
-                key={trailState.id} // CRITICAL: Forces complete re-initialization
+                key={trailState.id} 
                 width={TAIL_WIDTH}
                 length={TAIL_LENGTH}
                 color={new THREE.Color('#a0c4ff')} 
@@ -141,11 +159,11 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
             
             {/* 2. The Gaseous Coma (Glow) */}
             <mesh ref={meshRef}>
-                <planeGeometry args={[HEAD_SIZE * 12, HEAD_SIZE * 12]} /> {/* Scaled up for glow */}
+                <planeGeometry args={[HEAD_SIZE * 12, HEAD_SIZE * 12]} /> 
                 <meshBasicMaterial 
                     map={comaTexture}
                     transparent
-                    opacity={0.8}
+                    opacity={0} // Start invisible, fade in via logic
                     depthWrite={false}
                     blending={THREE.AdditiveBlending}
                 />
