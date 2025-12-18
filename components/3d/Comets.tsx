@@ -16,7 +16,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
 
   // --- Configuration ---
   const HEAD_SIZE = 0.04 
-  const SPEED = 0.3 // Tripled speed (0.1 -> 0.3)
+  const SPEED = 0.2 // Reduced to 2x (was 0.3)
   const START_DELAY = 1.0 
   const SPIRAL_TURNS = 1.5 
 
@@ -213,8 +213,8 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
           
           if (p.ref.current) {
               // Decay rate determines trail length
-              // 0.05 -> ~20 seconds life (Tuned for 0.3 speed)
-              p.life -= delta * 0.05 
+              // 0.035 -> ~28 seconds life (Balanced for 0.2 speed)
+              p.life -= delta * 0.035 
               
               const mat = p.ref.current.material as THREE.Material
               // Additive blending means opacity accumulates, so keep individual opacity controlled
