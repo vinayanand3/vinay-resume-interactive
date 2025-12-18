@@ -37,7 +37,7 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
     t: 0,
     speed: 0.3, // Speed of travel
     delay: 2, // Initial delay
-    phase: 'delay' as 'delay' | 'flying' | 'fading',
+    phase: 'delay' as 'delay' | 'spawning' | 'flying' | 'fading', // Added 'spawning'
     opacity: 1
   })
 
@@ -50,18 +50,31 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
     if (s.phase === 'delay') {
         s.delay -= delta
         
-        // Ensure position is reset continuously during delay (so it's ready)
+        // Keep forcing reset (just in case)
         group.current.position.copy(startPos)
         group.current.visible = false
         
         if (s.delay <= 0) {
-            s.phase = 'flying'
-            s.t = 0
-            s.opacity = 1
+            // Move to spawning phase, NOT flying yet
+            s.phase = 'spawning'
+            // Ensure visibility is ON so matrix updates correctly, but opacity 0? 
+            // We'll keep visible=true, but Head opacity starts at 0 anyway if we want?
+            // Actually Head opacity is 1 in 'flying'. 
+            // We'll set visible true here.
             group.current.visible = true
-            setShowTrail(true) // Mount trail only when ready to fly
+            group.current.position.copy(startPos)
+            group.current.updateMatrixWorld(true) // FORCE MATRIX UPDATE
         }
-    } 
+    } else if (s.phase === 'spawning') {
+        // Wait one frame to let the position settle in the scene graph
+        s.phase = 'flying'
+        s.t = 0
+        s.opacity = 1
+        setShowTrail(true) // NOW mount the trail
+    } else {
+        // Flying or Fading
+        group.current.visible = true
+    }
 
     if (s.phase === 'flying') {
         s.t += delta * s.speed
