@@ -88,13 +88,15 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
         group.current.updateMatrixWorld(true)
         
         s.warmup += 1
-        // Increased warmup slightly more to be absolutely safe
+        // Keep warmup for stability of the Head mesh
         if (s.warmup > 5) {
             s.phase = 'active'
             s.progress = 0
-            setTrailState(prev => ({ visible: true, id: prev.id + 1 })) 
             
-            // Fade in opacity starting now
+            // NOTE: We do NOT enable the trail here anymore.
+            // We wait until the comet has started moving/fading in to enable it.
+            // This guarantees the Trail never 'sees' the teleportation frame.
+            
             s.timer = 0 // use timer for fading in
         }
     }
@@ -107,6 +109,12 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
             const opacity = Math.min(s.timer, 1)
             if (meshRef.current) {
                 (meshRef.current.material as THREE.Material).opacity = opacity * 0.8;
+            }
+            
+            // TRIGGER TRAIL: Only enable trail after we have faded in slightly (approx 100ms)
+            // This ensures the Head is already moving and the "Teleport" is long gone.
+            if (s.timer > 0.2 && !trailState.visible) {
+                 setTrailState(prev => ({ visible: true, id: prev.id + 1 })) 
             }
         }
         
