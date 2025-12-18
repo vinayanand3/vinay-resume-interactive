@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-export default function GlowingParticles({ count = 10000 }) {
+export default function GlowingParticles({ count = 10000, coreRef }: { count?: number, coreRef?: React.MutableRefObject<{ intensity: number }> }) {
   const mesh = useRef<THREE.Group>(null!)
   const { viewport, mouse } = useThree()
 
@@ -103,13 +103,14 @@ export default function GlowingParticles({ count = 10000 }) {
     blending: THREE.AdditiveBlending
   }), [])
 
+
   useFrame((state) => {
     const time = state.clock.getElapsedTime()
     
-    mesh.current.rotation.z = time * 0.05 // Increased speed
+    mesh.current.rotation.z = time * 0.05
     
-    // Mouse gentle tilt + Base Isometric Tilt (60 degrees)
-    const baseTilt = Math.PI / 3 // 60 degrees
+    // Mouse gentle tilt
+    const baseTilt = Math.PI / 3
     const targetX = (mouse.x * viewport.width) / 30
     const targetY = (mouse.y * viewport.height) / 30
     
@@ -118,6 +119,24 @@ export default function GlowingParticles({ count = 10000 }) {
     
     mesh.current.rotation.x += (desiredX - currentX) * 0.05
     mesh.current.rotation.y += (targetX * 0.05 - mesh.current.rotation.y) * 0.05
+
+    // Handle Core Flash
+    if (coreRef) {
+        // Decay intensity
+        coreRef.current.intensity = THREE.MathUtils.lerp(coreRef.current.intensity, 0, 0.02)
+        
+        // Modulate dust material
+        // We need to access the material. Since it's a primitive, we can verify via ref later, 
+        // but easier just to recreate logic or use a ref for material.
+        // Actually, since we memoized 'dustMaterial', we can act on it directly?
+        // Yes, dustMaterial is consistent.
+        
+        // Base opacity 0.6 + intensity
+        dustMaterial.opacity = 0.6 + coreRef.current.intensity * 2
+        dustMaterial.size = 0.03 + coreRef.current.intensity * 0.05
+        // Optional: Shift color to white on high intensity?
+        // Keep simple for now.
+    }
   })
 
   return (

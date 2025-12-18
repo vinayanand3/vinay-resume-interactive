@@ -3,13 +3,16 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
 
-function Comet({ startY, speed, delay }: { startY: number, speed: number, delay: number }) {
+function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity: number }> }) {
   const group = useRef<THREE.Group>(null!)
+  const meshRef = useRef<THREE.Mesh>(null!)
   const { viewport } = useThree()
   
-  // Random start position (off-screen left)
-  const xStart = -viewport.width / 2 - Math.random() * 10 - delay
-
+  // Path: Start (Top Left) -> End (Center)
+  const startPos = new THREE.Vector3(-viewport.width / 2, viewport.height / 3, 0)
+  const endPos = new THREE.Vector3(0, 0, 0)
+  const controlPos = new THREE.Vector3(-viewport.width / 4, 0, 2) // Curve out a bit
+  
   // Create a radial gradient texture for the coma/glow
   const glowTexture = useMemo(() => {
     const canvas = document.createElement('canvas')
@@ -26,25 +29,76 @@ function Comet({ startY, speed, delay }: { startY: number, speed: number, delay:
     return new THREE.CanvasTexture(canvas)
   }, [])
 
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime()
+  // State in ref to avoid re-renders
+  const state = useRef({
+    t: 0,
+    speed: 0.3, // Speed of travel
+    delay: 2, // Initial delay
+    phase: 'delay' as 'delay' | 'flying' | 'fading',
+    opacity: 1
+  })
+
+  useFrame((_, delta) => {
+    if (!group.current) return
     
-    if (group.current) {
-        // Move left to right, slightly downward curve
-        const t = (time * speed + delay)
-        const distance = t % (viewport.width + 20)
+    // Update State
+    const s = state.current
+    
+    if (s.phase === 'delay') {
+        s.delay -= delta
+        if (s.delay <= 0) {
+            s.phase = 'flying'
+            s.t = 0
+            s.opacity = 1
+            // Reset position
+            group.current.position.copy(startPos)
+        }
+        // Hide during delay
+        group.current.visible = false
+    } else {
+        group.current.visible = true
+    }
+
+    if (s.phase === 'flying') {
+        s.t += delta * s.speed
         
-        const x = xStart + distance
-        // Gentle arc: y = startY - slight curve
-        // Using sine to modulate Y slightly for "organic" flight? 
-        // Or just a linear path with slight offset. 
-        // User asked for "Ghostly beacon", simple straight or slight arc is best.
-        const y = startY - Math.sin(t * 0.1) * 0.5 
+        // Quadratic Bezier: (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
+        const t = s.t
+        const invT = 1 - t
         
-        group.current.position.set(x, y, -2)
+        group.current.position.x = invT * invT * startPos.x + 2 * invT * t * controlPos.x + t * t * endPos.x
+        group.current.position.y = invT * invT * startPos.y + 2 * invT * t * controlPos.y + t * t * endPos.y
+        group.current.position.z = invT * invT * startPos.z + 2 * invT * t * controlPos.z + t * t * endPos.z
         
-        // Reset logic handled by modulo, but we might want to vary Y on reset
-        // To strictly "respawn" with new random Y, we'd need state, but simple loop is fine for background.
+        // Face direction? simple lookAt next point
+        // For now, fixed rotation is okay as it's a glowing ball
+        
+        // Check arrival
+        if (s.t >= 1) {
+            s.phase = 'fading'
+            // Trigger Core Flash
+            if (coreRef) {
+                coreRef.current.intensity = 1.0 // Max flash
+            }
+        }
+    }
+
+    if (s.phase === 'fading') {
+        // Continue moving slightly into the core
+        group.current.position.lerp(new THREE.Vector3(2, -1, -2), delta * 0.5)
+        
+        // Fade out
+        s.opacity -= delta * 2
+        if (s.opacity <= 0) {
+           s.phase = 'delay'
+           s.delay = Math.random() * 3 + 2 // Random delay before next comet
+        }
+    }
+    
+    // Apply opacity to children materials
+    // We can do this by traversing or just targeting known meshes
+    if (meshRef.current) {
+        (meshRef.current.material as THREE.Material).opacity = s.opacity * 0.8;
     }
   })
 
@@ -52,27 +106,27 @@ function Comet({ startY, speed, delay }: { startY: number, speed: number, delay:
     <group ref={group}>
         {/* Tail */}
         <Trail
-            width={3} // Width of the trail
-            length={12} // Length of the trail
-            color={new THREE.Color('#a0c4ff')} // Silvery/Bluish
-            attenuation={(t) => t * t} // Tapering
+            width={2} // Reduced width
+            length={8} 
+            color={new THREE.Color('#a0c4ff')} 
+            attenuation={(t) => t * t} 
         >
             <mesh>
                 <sphereGeometry args={[0.05, 16, 16]} />
-                <meshBasicMaterial color="#ffffff" transparent opacity={0.3} /> 
+                <meshBasicMaterial color="#ffffff" transparent opacity={0} /> 
             </mesh>
         </Trail>
 
         {/* Head Visuals */}
-        <group rotation={[0, 0, Math.PI / 4]}> {/* Rotate to align glow if needed */}
-             {/* Solid Nucleus (Core) */}
+        <group rotation={[0, 0, Math.PI / 4]}>
+            {/* Solid Nucleus (Core) */}
             <mesh>
-                <sphereGeometry args={[0.08, 16, 16]} />
-                <meshBasicMaterial color="#ffffff" toneMapped={false} />
+                <sphereGeometry args={[0.04, 16, 16]} /> {/* Smaller nucleus */}
+                <meshBasicMaterial color="#ffffff" toneMapped={false} transparent opacity={state.current.opacity} />
             </mesh>
             
             {/* Coma (Glow) */}
-            <mesh scale={[4, 4, 1]}>
+            <mesh ref={meshRef} scale={[2, 2, 1]}> {/* Half size (was 4) */}
                 <planeGeometry args={[1, 1]} />
                 <meshBasicMaterial 
                     map={glowTexture} 
@@ -88,15 +142,10 @@ function Comet({ startY, speed, delay }: { startY: number, speed: number, delay:
   )
 }
 
-export default function Comets() {
-  const { viewport } = useThree()
-  const topY = viewport.height / 2 - 3
-
+export default function Comets({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity: number }> }) {
   return (
     <group>
-       {/* Fewer, slower, more impressive comets */}
-       <Comet startY={topY} speed={1.5} delay={0} />
-       <Comet startY={topY - 2} speed={1.2} delay={5} />
+       <CometInstance coreRef={coreRef} />
     </group>
   )
 }
