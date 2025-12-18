@@ -16,7 +16,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
 
   // --- Configuration ---
   const HEAD_SIZE = 0.04 
-  const SPEED = 0.4 // Reduced as requested (was 0.8)
+  const SPEED = 0.05 // Matches galaxy rotation speed (approx)
   const START_DELAY = 1.0 
   const SPIRAL_TURNS = 1.5 
 
@@ -82,8 +82,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
             
             // Random Start Angle
             s.startAngle = Math.random() * Math.PI * 2
-            // Start at the edge of the viewport (largest dimension)
-            // Increased radius slightly to ensure it spawns "outside" the visible core area appropriately
+            // Start further out to account for slow speed (long journey)
             s.startRadius = Math.max(viewport.width, viewport.height) / 1.5
             
             group.current.visible = true
@@ -159,8 +158,8 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
  * Manages a pool of meshes that spawn at target position and fade out.
  */
 function DustTrail({ target, texture, active }: { target: React.MutableRefObject<THREE.Group>, texture: THREE.Texture, active: boolean }) {
-    // Pool size
-    const COUNT = 60
+    // Increased pool size for longer trail
+    const COUNT = 300 
     
     // Stable particle state pool
     const particles = useMemo(() => new Array(COUNT).fill(0).map(() => ({
@@ -178,8 +177,8 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
        // --- Spawning Logic ---
        if (active && target.current) {
            spawnTimer.current += delta
-           // Spawn rate: Every 0.03s (30ms) -> High density
-           if (spawnTimer.current > 0.03) {
+           // Spawn rate: Slower (every 0.25s) because comet moves slower
+           if (spawnTimer.current > 0.25) {
                spawnTimer.current = 0
                
                // Get next particle in pool
@@ -214,8 +213,8 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
           if (!p.active) return
           
           if (p.ref.current) {
-              // Fade out
-              p.life -= delta * 0.8 // Lasts ~1.2s
+              // Slower decay for 5x longer trail (approx 50s life)
+              p.life -= delta * 0.02 
               
               const mat = p.ref.current.material as THREE.Material
               mat.opacity = p.life * 0.6 
