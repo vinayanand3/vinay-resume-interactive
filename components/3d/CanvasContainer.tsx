@@ -3,6 +3,7 @@ import { PerspectiveCamera, Environment, Stars } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { Suspense } from 'react'
 import GlowingParticles from './GlowingParticles'
+import Comets from './Comets'
 
 export default function CanvasContainer({ children }: { children?: React.ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export default function CanvasContainer({ children }: { children?: React.ReactNo
 
         <Suspense fallback={null}>
           <GlowingParticles />
+          <Comets />
         </Suspense>
 
         {/* Post Processing for Glow */}

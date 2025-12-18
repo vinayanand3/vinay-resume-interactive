@@ -106,7 +106,7 @@ export default function GlowingParticles({ count = 10000 }) {
   useFrame((state) => {
     const time = state.clock.getElapsedTime()
     
-    mesh.current.rotation.z = time * 0.02
+    mesh.current.rotation.z = time * 0.05 // Increased speed
     
     // Mouse gentle tilt + Base Isometric Tilt (60 degrees)
     const baseTilt = Math.PI / 3 // 60 degrees
