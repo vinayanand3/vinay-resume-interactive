@@ -52,9 +52,11 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
   const [trailState, setTrailState] = useState({ visible: false, id: 0 })
 
   // --- Path Calculations ---
-  const startPos = useMemo(() => new THREE.Vector3(-viewport.width / 2 - 2, viewport.height / 4, 0), [viewport])
+  // Start: Right side, slightly upper
+  const startPos = useMemo(() => new THREE.Vector3(viewport.width / 2 + 2, viewport.height / 4, 0), [viewport])
   const endPos = useMemo(() => new THREE.Vector3(0, 0, 0), [])
-  const controlPos = useMemo(() => new THREE.Vector3(-viewport.width / 4, -2, 1), [viewport])
+  // Control Point: Pulls the curve from the right
+  const controlPos = useMemo(() => new THREE.Vector3(viewport.width / 4, -2, 1), [viewport])
 
   useFrame((_, delta) => {
     if (!group.current) return
