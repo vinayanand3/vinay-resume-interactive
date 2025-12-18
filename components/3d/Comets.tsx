@@ -82,8 +82,8 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
             
             // Random Start Angle
             s.startAngle = Math.random() * Math.PI * 2
-            // Start further out to account for slow speed (long journey)
-            s.startRadius = Math.max(viewport.width, viewport.height) / 1.5
+            // Start closer to the visible galaxy edge as requested
+            s.startRadius = Math.max(viewport.width, viewport.height) / 2.2
             
             group.current.visible = true
              // Reset opacity
@@ -158,8 +158,8 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
  * Manages a pool of meshes that spawn at target position and fade out.
  */
 function DustTrail({ target, texture, active }: { target: React.MutableRefObject<THREE.Group>, texture: THREE.Texture, active: boolean }) {
-    // Increased pool size for longer trail
-    const COUNT = 300 
+    // High density for "brushstroke" look
+    const COUNT = 600
     
     // Stable particle state pool
     const particles = useMemo(() => new Array(COUNT).fill(0).map(() => ({
@@ -177,8 +177,9 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
        // --- Spawning Logic ---
        if (active && target.current) {
            spawnTimer.current += delta
-           // Spawn rate: Slower (every 0.25s) because comet moves slower
-           if (spawnTimer.current > 0.25) {
+           // Continuous stream: Spawn every frame roughly (0.016s)
+           // or slightly slower if needed, but we want a "plume"
+           if (spawnTimer.current > 0.016) {
                spawnTimer.current = 0
                
                // Get next particle in pool
@@ -188,39 +189,41 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
                p.active = true
                p.life = 1.0
                
-               // Calculate spawn position (World -> Local is tricky if parent moves, 
-               // but here DustTrail and Target are SIBLINGS in the same container.
-               // So we can just copy Target's local position!)
+               // Calculate spawn position (Copy from Target)
                if (p.ref.current) {
                    p.ref.current.position.copy(target.current.position)
                    
-                   // Add random scatter (dust width)
-                   p.ref.current.position.x += (Math.random() - 0.5) * 0.3
-                   p.ref.current.position.y += (Math.random() - 0.5) * 0.3
-                   p.ref.current.position.z += (Math.random() - 0.5) * 0.1
+                   // Tighter scatter for "brushstroke" feel (less wide)
+                   p.ref.current.position.x += (Math.random() - 0.5) * 0.1
+                   p.ref.current.position.y += (Math.random() - 0.5) * 0.1
+                   p.ref.current.position.z += (Math.random() - 0.5) * 0.05
                    
-                   p.ref.current.scale.setScalar(Math.random() * 0.5 + 0.5) // Random start size
+                   p.ref.current.scale.setScalar(Math.random() * 0.4 + 0.6) // Initial size
                    p.ref.current.visible = true
-                   ;(p.ref.current.material as THREE.Material).opacity = 0.6 // Start semi-transparent
+                   ;(p.ref.current.material as THREE.Material).opacity = 0.8 // Start very luminous
                }
                
                cursor.current = (cursor.current + 1) % COUNT
            }
        }
   
-       // --- Update Logic (for ALL particles, active or fading) ---
+       // --- Update Logic (for ALL particles) ---
        particles.forEach(p => {
           if (!p.active) return
           
           if (p.ref.current) {
-              // Slower decay for 5x longer trail (approx 50s life)
-              p.life -= delta * 0.02 
+              // Decay rate determines trail length
+              // 0.015 -> ~66 seconds (Very long trail)
+              p.life -= delta * 0.015 
               
               const mat = p.ref.current.material as THREE.Material
+              // Additive blending means opacity accumulates, so keep individual opacity controlled
               mat.opacity = p.life * 0.6 
               
-              // Shrink slightly
-              p.ref.current.scale.setScalar(p.life * 0.8)
+              // Tapering Brushstroke: Non-linear scaling
+              // As life drops, scale drops faster to create a point at the end
+              const scale = Math.pow(p.life, 1.5) * 0.8 
+              p.ref.current.scale.setScalar(scale)
                
               if (p.life <= 0) {
                   p.active = false
