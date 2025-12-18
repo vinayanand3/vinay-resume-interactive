@@ -1,12 +1,10 @@
 import { Canvas } from '@react-three/fiber'
 import { PerspectiveCamera, Environment, Stars } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
-import { useRef, Suspense } from 'react'
+import { Suspense } from 'react'
 import GlowingParticles from './GlowingParticles'
-import Comets from './Comets'
 
 export default function CanvasContainer({ children }: { children?: React.ReactNode }) {
-  const coreRef = useRef<{ intensity: number }>({ intensity: 0 })
 
   return (
     <div className="fixed inset-0 z-0">
@@ -23,8 +21,7 @@ export default function CanvasContainer({ children }: { children?: React.ReactNo
         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
 
         <Suspense fallback={null}>
-          <GlowingParticles coreRef={coreRef} />
-          <Comets coreRef={coreRef} />
+          <GlowingParticles />
         </Suspense>
 
         {/* Post Processing for Glow */}
