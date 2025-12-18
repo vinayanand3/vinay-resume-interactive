@@ -16,7 +16,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
 
   // --- Configuration ---
   const HEAD_SIZE = 0.04 
-  const SPEED = 0.2 // Reduced to 2x (was 0.3)
+  const SPEED = 0.1 // Reduced by half (0.2 -> 0.1)
   const START_DELAY = 1.0 
   const SPIRAL_TURNS = 1.5 
 
@@ -158,8 +158,8 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
  * Manages a pool of meshes that spawn at target position and fade out.
  */
 function DustTrail({ target, texture, active }: { target: React.MutableRefObject<THREE.Group>, texture: THREE.Texture, active: boolean }) {
-    // Massive pool to support long lifetime without recycling active particles
-    const COUNT = 2500
+    // Massive pool to support very long lifetime (60s+) without recycling
+    const COUNT = 5000 
     
     // Stable particle state pool
     const particles = useMemo(() => new Array(COUNT).fill(0).map(() => ({
@@ -213,8 +213,8 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
           
           if (p.ref.current) {
               // Decay rate determines trail length
-              // 0.035 -> ~28 seconds life
-              p.life -= delta * 0.035
+              // 0.015 -> ~66 seconds life (Extremely long tail)
+              p.life -= delta * 0.015
               
               const mat = p.ref.current.material as THREE.Material
               // Additive blending means opacity accumulates, so keep individual opacity controlled
