@@ -22,18 +22,14 @@
     "@theatre/studio": "^0.7.2",
     "@types/three": "^0.182.0",
     "lucide-react": "^0.344.0",
-    "peerjs": "^1.5.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "three": "^0.182.0",
-    "uuid": "^13.0.0"
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
-    "@types/peerjs": "^0.0.30",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
-    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.20",
     "gh-pages": "^6.1.1",
