@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
 export default function GlowingParticles({ count = 10000 }) {
-  const mesh = useRef<THREE.Points>(null!)
+  const mesh = useRef<THREE.Group>(null!)
   const { viewport, mouse } = useThree()
 
   const particlesPosition = useMemo(() => {
@@ -53,11 +53,52 @@ export default function GlowingParticles({ count = 10000 }) {
     return { positions, colors }
   }, [count])
 
+  // Secondary Particle System: Central Dust Cloud
+  const dustParticles = useMemo(() => {
+     const dustCount = 2000
+     const positions = new Float32Array(dustCount * 3)
+     const colors = new Float32Array(dustCount * 3)
+     const colorCore = new THREE.Color('#ff8c00') // Dark Orange
+     const colorOuter = new THREE.Color('#ffbd4a') // Lighter Gold
+
+     for (let i = 0; i < dustCount; i++) {
+        const i3 = i * 3
+        // Spherical distribution for the core "Bulge"
+        const r = Math.random() * 2 // Radius 2
+        const theta = Math.random() * Math.PI * 2
+        const phi = Math.acos((Math.random() * 2) - 1)
+        
+        const x = r * Math.sin(phi) * Math.cos(theta)
+        const y = r * Math.sin(phi) * Math.sin(theta)
+        const z = r * Math.cos(phi) * 0.6 // Slightly flattened sphere
+
+        positions[i3] = x
+        positions[i3 + 1] = y
+        positions[i3 + 2] = z
+
+        // Color gradient from center
+        const mixedColor = colorCore.clone().lerp(colorOuter, r / 2)
+        colors[i3] = mixedColor.r
+        colors[i3 + 1] = mixedColor.g
+        colors[i3 + 2] = mixedColor.b
+     }
+     return { positions, colors }
+  }, [])
+
   const material = useMemo(() => new THREE.PointsMaterial({
     size: 0.015,
-    vertexColors: true, // Enable vertex colors
+    vertexColors: true,
     transparent: true,
     opacity: 0.8,
+    sizeAttenuation: true,
+    blending: THREE.AdditiveBlending
+  }), [])
+
+  const dustMaterial = useMemo(() => new THREE.PointsMaterial({
+    size: 0.03, // Larger "dust" motes
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.6, // Softer
     sizeAttenuation: true,
     blending: THREE.AdditiveBlending
   }), [])
@@ -72,37 +113,52 @@ export default function GlowingParticles({ count = 10000 }) {
     const targetX = (mouse.x * viewport.width) / 30
     const targetY = (mouse.y * viewport.height) / 30
     
-    // Smoothly interpolate to target (Base Tilt + Mouse Offset)
-    // using a simple lerp logic manually implies we track state, but R3F useFrame runs 60fps
-    // We can just add the offset to current, but we need to know the 'base'.
-    // Better: Set rotation directly based on damped target
-    
-    // Since we accumulate rotation, we need to be careful. 
-    // Let's use the mouse to OFFSET the base tilt.
     const currentX = mesh.current.rotation.x
-    const desiredX = -baseTilt + (targetY * 0.05) // Negative tilt to look from top-angle
+    const desiredX = -baseTilt + (targetY * 0.05) 
     
     mesh.current.rotation.x += (desiredX - currentX) * 0.05
     mesh.current.rotation.y += (targetX * 0.05 - mesh.current.rotation.y) * 0.05
   })
 
   return (
-    <points ref={mesh}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={particlesPosition.positions.length / 3}
-          array={particlesPosition.positions}
-          itemSize={3}
-        />
-        <bufferAttribute
-          attach="attributes-color"
-          count={particlesPosition.colors.length / 3}
-          array={particlesPosition.colors}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <primitive object={material} attach="material" />
-    </points>
+    <group ref={mesh}>
+      {/* Main Spiral Galaxy */}
+      <points>
+        <bufferGeometry>
+            <bufferAttribute
+            attach="attributes-position"
+            count={particlesPosition.positions.length / 3}
+            array={particlesPosition.positions}
+            itemSize={3}
+            />
+            <bufferAttribute
+            attach="attributes-color"
+            count={particlesPosition.colors.length / 3}
+            array={particlesPosition.colors}
+            itemSize={3}
+            />
+        </bufferGeometry>
+        <primitive object={material} attach="material" />
+      </points>
+
+      {/* Central Dust Cloud */}
+      <points>
+        <bufferGeometry>
+            <bufferAttribute
+            attach="attributes-position"
+            count={dustParticles.positions.length / 3}
+            array={dustParticles.positions}
+            itemSize={3}
+            />
+            <bufferAttribute
+            attach="attributes-color"
+            count={dustParticles.colors.length / 3}
+            array={dustParticles.colors}
+            itemSize={3}
+            />
+        </bufferGeometry>
+        <primitive object={dustMaterial} attach="material" />
+      </points>
+    </group>
   )
 }
