@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { Github, Linkedin, Twitter, Mail, ExternalLink, ArrowRight, FileText } from 'lucide-react';
+import CanvasContainer from './components/3d/CanvasContainer';
 import { RESUME_DATA } from './constants';
 import { SocialLink, Project, Experience, Education } from './types';
 
@@ -183,7 +184,7 @@ const ExperienceCard: React.FC<{
         )}
       </div>
 
-      <div className="md:col-span-6">
+      <div className="md:col-span-6 glass-panel p-6 rounded-xl transition-all hover:bg-zinc-800/50">
         <h3 className="font-medium text-zinc-100 text-lg group-hover:text-accent transition-colors flex items-center gap-2">
           {job.role}
           <span className="text-zinc-500 font-normal text-base"> — {job.company}</span>
@@ -197,7 +198,7 @@ const ExperienceCard: React.FC<{
           {job.technologies.map((tech) => (
             <span
               key={tech}
-              className="px-2.5 py-1 text-xs rounded-full bg-zinc-800/50 text-accent border border-zinc-800/50"
+              className="px-2.5 py-1 text-xs rounded-full bg-zinc-800/50 text-accent border border-zinc-700/50"
             >
               {tech}
             </span>
@@ -221,7 +222,7 @@ const ExperienceCard: React.FC<{
 
         {/* Expanded project details */}
         {project && expanded && (
-          <div className="mt-5 pt-5 border-t border-zinc-800/60">
+          <div className="mt-5 pt-5 border-t border-zinc-700/50">
             <ProjectStory project={project} />
           </div>
         )}
@@ -314,7 +315,9 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-background text-zinc-400 selection:bg-accent/20 selection:text-accent font-sans">
+    <>
+      <CanvasContainer />
+      <div className="min-h-screen bg-transparent text-zinc-400 selection:bg-accent/20 selection:text-accent font-sans relative z-10">
       <div className="max-w-screen-2xl mx-auto px-6 md:px-12 lg:px-12 xl:px-16 2xl:px-20 py-12 lg:py-0">
         {/* On desktop, keep the left column fixed and scroll only the right column. */}
         <div className="lg:flex lg:h-screen lg:overflow-hidden lg:justify-between lg:gap-8 xl:gap-10">
@@ -468,8 +471,9 @@ export default function App() {
             {/* FOOTER (intentionally empty) */}
 
           </main>
-        </div>
       </div>
-    </div>
+      </div>
+      </div>
+    </>
   );
 }
