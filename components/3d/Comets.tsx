@@ -1,6 +1,5 @@
-import { useRef, useMemo, useState } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
 
 /**
@@ -16,15 +15,12 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
 
   // --- Configuration ---
   const HEAD_SIZE = 0.04 
-  const TAIL_WIDTH = 1.5
-  const TAIL_LENGTH = 10
-  const SPEED = 0.5 
-  const START_DELAY = 1.5 
+  const SPEED = 0.8 // Slightly faster for spiral
+  const START_DELAY = 1.0 
+  const SPIRAL_TURNS = 1.5 // How many times it circles before hitting core
 
   // --- Assets ---
-  // Texture for the Coma (Glowing Head)
   const comaTexture = useMemo(() => {
-    // ... (texture generation same)
     const canvas = document.createElement('canvas')
     canvas.width = 128
     canvas.height = 128
@@ -38,23 +34,15 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
     ctx.fillRect(0, 0, 128, 128)
     return new THREE.CanvasTexture(canvas)
   }, [])
-  
-  // ... (Rest of state/logic stays almost the same, just ensuring correct context)
 
   // --- State ---
   const state = useRef({
-    phase: 'waiting' as 'waiting' | 'spawning' | 'active' | 'impacting',
+    phase: 'waiting' as 'waiting' | 'active' | 'impacting',
     timer: 0, 
     progress: 0,
-    warmup: 0 
+    startAngle: 0,
+    startRadius: 0
   })
-
-  const [trailState, setTrailState] = useState({ visible: false, id: 0 })
-
-  // --- Path Calculations ---
-  const startPos = useMemo(() => new THREE.Vector3(-viewport.width / 3.2, -0.5, 0), [viewport])
-  const endPos = useMemo(() => new THREE.Vector3(0, 0, 0), [])
-  const controlPos = useMemo(() => new THREE.Vector3(-viewport.width / 8, -2, 2), [viewport])
 
   useFrame((_, delta) => {
     if (!group.current) return
@@ -66,64 +54,48 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
         group.current.visible = false
         
         if (s.timer <= 0) {
-            s.phase = 'spawning'
-            s.warmup = 0 
-            s.progress = 0
-            
-            group.current.position.copy(startPos)
-            group.current.updateMatrixWorld(true)
-            group.current.visible = true
-            
-            if (meshRef.current) {
-                (meshRef.current.material as THREE.Material).opacity = 0;
-            }
-        }
-    } 
-    else if (s.phase === 'spawning') {
-        group.current.position.copy(startPos)
-        group.current.updateMatrixWorld(true)
-        
-        s.warmup += 1
-        if (s.warmup > 5) {
             s.phase = 'active'
             s.progress = 0
-            // Trail NOT enabled here. Delayed.
-            s.timer = 0 
-        }
-    }
-    else if (s.phase === 'active') {
-        s.progress += delta * (SPEED * 0.5) 
-        
-        // Timer tracks time since active start
-        if (s.timer < 1) {
-            s.timer += delta * 2
-            const opacity = Math.min(s.timer, 1)
-            if (meshRef.current) {
-                (meshRef.current.material as THREE.Material).opacity = opacity * 0.8;
-            }
             
-            // DELAYED ENABLE: Wait 250ms (timer > 0.25) to be super safe
-            if (s.timer > 0.25 && !trailState.visible) {
-                 setTrailState(prev => ({ visible: true, id: prev.id + 1 })) 
-            }
+            // Random Start Angle
+            s.startAngle = Math.random() * Math.PI * 2
+            // Start at the edge of the viewport (largest dimension)
+            s.startRadius = Math.max(viewport.width, viewport.height) / 1.5
+            
+            group.current.visible = true
+             // Reset opacity
+            if (meshRef.current) (meshRef.current.material as THREE.Material).opacity = 0;
         }
+    } 
+    else if (s.phase === 'active') {
+        s.progress += delta * (SPEED * 0.3) // Adjust speed scaling
         
-        const t = s.progress
-        const invT = 1 - t
+        // Fade in
+        if (s.progress < 0.2) {
+             if (meshRef.current) (meshRef.current.material as THREE.Material).opacity = (s.progress / 0.2);
+        }
+
+        // Spiral Math
+        // Radius decreases from StartRadius to 0
+        const r = s.startRadius * (1 - s.progress)
         
-        const x = (invT * invT * startPos.x) + (2 * invT * t * controlPos.x) + (t * t * endPos.x)
-        const y = (invT * invT * startPos.y) + (2 * invT * t * controlPos.y) + (t * t * endPos.y)
-        const z = (invT * invT * startPos.z) + (2 * invT * t * controlPos.z) + (t * t * endPos.z)
+        // Angle changes: moves CLOCKWISE (Negative direction)
+        // Angle = Start - (Progress * Turns * 2PI)
+        const theta = s.startAngle - (s.progress * SPIRAL_TURNS * Math.PI * 2)
+        
+        const x = r * Math.cos(theta)
+        const y = r * Math.sin(theta)
+        const z = 0 
         
         group.current.position.set(x, y, z)
         
+        // Impact Logic
         if (s.progress >= 1) {
             s.phase = 'impacting'
             if (coreRef) coreRef.current.intensity = 1.0 
         }
     }
     else if (s.phase === 'impacting') {
-        setTrailState(prev => ({ ...prev, visible: false })) 
         s.phase = 'waiting'
         s.timer = START_DELAY + Math.random() 
     }
@@ -131,23 +103,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
 
   return (
     <group ref={group}>
-        {/* Tail Component - Re-enabled with strict checks */}
-        {trailState.visible && (
-            <Trail
-                key={trailState.id} 
-                width={TAIL_WIDTH}
-                length={TAIL_LENGTH}
-                color={new THREE.Color('#a0c4ff')} 
-                attenuation={(t) => t * t} 
-            >
-                <mesh>
-                    <sphereGeometry args={[HEAD_SIZE, 8, 8]} />
-                    <meshBasicMaterial visible={false} /> 
-                </mesh>
-            </Trail>
-        )}
-
-        {/* Head Visuals */}
+        {/* Head Visuals Only - No Trail */}
         <group>
             {/* 1. The Solid Core (Nucleus) */}
             <mesh>
@@ -161,7 +117,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
                 <meshBasicMaterial 
                     map={comaTexture}
                     transparent
-                    opacity={0} // Start invisible, fade in via logic
+                    opacity={1} 
                     depthWrite={false}
                     blending={THREE.AdditiveBlending}
                 />
