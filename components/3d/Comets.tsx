@@ -166,8 +166,9 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
        ref: React.createRef<THREE.Mesh>(),
        life: 0,
        active: false,
-       // Small random offset for "dust cloud" feel
-       offset: new THREE.Vector3(0, 0, 0) 
+       offset: new THREE.Vector3(0, 0, 0),
+       velocity: new THREE.Vector3(0, 0, 0),
+       rotSpeed: 0
     })), [])
     
     const cursor = useRef(0)
@@ -192,20 +193,28 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
                if (p.ref.current) {
                    p.ref.current.position.copy(target.current.position)
                    
-                   // Dust Cloud Scatter: Much wider spread for volume
-                   // Was 0.1, increasing to 0.4 for a "cloud" width
-                   p.ref.current.position.x += (Math.random() - 0.5) * 0.4
-                   p.ref.current.position.y += (Math.random() - 0.5) * 0.4
-                   p.ref.current.position.z += (Math.random() - 0.5) * 0.2
+                   // Initial Scatter (The starting width of the disturbance)
+                   p.ref.current.position.x += (Math.random() - 0.5) * 0.2
+                   p.ref.current.position.y += (Math.random() - 0.5) * 0.2
+                   p.ref.current.position.z += (Math.random() - 0.5) * 0.1
                    
-                   // Random Rotation for natural cloud look
+                   // Initialize Disturbance Physics (The "Wake")
+                   // Random drift velocity
+                   p.velocity.set(
+                       (Math.random() - 0.5) * 0.05,
+                       (Math.random() - 0.5) * 0.05,
+                       (Math.random() - 0.5) * 0.01
+                   )
+                   
+                   // Random Rotation Speed
+                   p.rotSpeed = (Math.random() - 0.5) * 2.0
                    p.ref.current.rotation.z = Math.random() * Math.PI
                    
-                   // Larger, softer particles
-                   p.ref.current.scale.setScalar(Math.random() * 0.8 + 0.5) 
+                   // Initial Size: Smaller dust grains
+                   p.ref.current.scale.setScalar(Math.random() * 0.3 + 0.3) 
                    
                    p.ref.current.visible = true
-                   ;(p.ref.current.material as THREE.Material).opacity = 0.4 // Lower opacity for diffuse cloud look
+                   ;(p.ref.current.material as THREE.Material).opacity = 0.5 // Start visible but soft
                }
                
                cursor.current = (cursor.current + 1) % COUNT
@@ -217,18 +226,19 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
           if (!p.active) return
           
           if (p.ref.current) {
-              // Decay rate determines trail length
-              // 0.015 -> ~66 seconds life
               p.life -= delta * 0.015
               
               const mat = p.ref.current.material as THREE.Material
-              // Additive blending means opacity accumulates
-              mat.opacity = p.life * 0.4 
+              mat.opacity = p.life * 0.5
               
-              // Tapering: Still shrink, but keep some volume
-              // Linear scale looks better for clouds than t^1.5 which pinches too fast
-              const scale = p.life * 0.8 
-              p.ref.current.scale.setScalar(scale)
+              // Physics Update
+              p.ref.current.position.addScaledVector(p.velocity, delta) // Drift
+              p.ref.current.rotation.z += p.rotSpeed * delta // Spin
+              
+              // Billowing Effect: Scale INCREASES as it fades (Dust dissipating)
+              // Grows from ~0.4 to ~1.2 over its life
+              const growth = 1.0 + (1.0 - p.life) * 2.0
+              p.ref.current.scale.setScalar(0.4 * growth)
                
               if (p.life <= 0) {
                   p.active = false
