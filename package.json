@@ -3,16 +3,16 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://vinayanand3.github.io/vinay-resume",
+  "homepage": "https://vinayanand3.github.io/vinay-resume-interactive",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "npm run deploy:all",
-    "build:preview": "VITE_BASE=/vinay-resume/preview/ npm run build",
-    "deploy:preview": "VITE_BASE=/vinay-resume/preview/ npm run build && gh-pages -d dist --dest preview",
-    "deploy:all": "rm -rf .dist-preview && VITE_BASE=/vinay-resume/preview/ npm run build && mv dist .dist-preview && npm run build && mkdir -p dist/preview && cp -R .dist-preview/* dist/preview/ && gh-pages -d dist"
+    "build:preview": "VITE_BASE=/vinay-resume-interactive/preview/ npm run build",
+    "deploy:preview": "VITE_BASE=/vinay-resume-interactive/preview/ npm run build && gh-pages -d dist --dest preview",
+    "deploy:all": "rm -rf .dist-preview && VITE_BASE=/vinay-resume-interactive/preview/ npm run build && mv dist .dist-preview && npm run build && mkdir -p dist/preview && cp -R .dist-preview/* dist/preview/ && gh-pages -d dist"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

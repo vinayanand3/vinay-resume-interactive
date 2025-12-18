@@ -4,8 +4,8 @@ This repository contains the source code for my **interactive resume / portfolio
 
 ## Live
 
-- **Stable**: `https://vinayanand3.github.io/vinay-resume/`
-- **Preview** (optional, published under a sub-path): `https://vinayanand3.github.io/vinay-resume/preview/`
+- **Stable**: `https://vinayanand3.github.io/vinay-resume-interactive/`
+- **Preview** (optional, published under a sub-path): `https://vinayanand3.github.io/vinay-resume-interactive/preview/`
 
 ## Tech stack
 
