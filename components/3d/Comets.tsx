@@ -158,8 +158,8 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
  * Manages a pool of meshes that spawn at target position and fade out.
  */
 function DustTrail({ target, texture, active }: { target: React.MutableRefObject<THREE.Group>, texture: THREE.Texture, active: boolean }) {
-    // High density for "brushstroke" look
-    const COUNT = 600
+    // Massive pool to support long lifetime without recycling active particles
+    const COUNT = 2500
     
     // Stable particle state pool
     const particles = useMemo(() => new Array(COUNT).fill(0).map(() => ({
@@ -177,9 +177,8 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
        // --- Spawning Logic ---
        if (active && target.current) {
            spawnTimer.current += delta
-           // Continuous stream: Spawn every frame roughly (0.016s)
-           // or slightly slower if needed, but we want a "plume"
-           if (spawnTimer.current > 0.016) {
+           // Spawn rate: 0.02s (50fps) - fast enough for smooth line
+           if (spawnTimer.current > 0.02) {
                spawnTimer.current = 0
                
                // Get next particle in pool
@@ -213,16 +212,16 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
           
           if (p.ref.current) {
               // Decay rate determines trail length
-              // 0.035 -> ~28 seconds life (Balanced for 0.2 speed)
-              p.life -= delta * 0.035 
+              // 0.02 -> 50 seconds life (Matches pool capacity of 2500 @ 50Hz)
+              p.life -= delta * 0.02 
               
               const mat = p.ref.current.material as THREE.Material
               // Additive blending means opacity accumulates, so keep individual opacity controlled
               mat.opacity = p.life * 0.6 
               
-              // Tapering Brushstroke: Non-linear scaling
-              // As life drops, scale drops faster to create a point at the end
-              const scale = Math.pow(p.life, 1.5) * 0.8 
+              // Tapering Brushstroke: Linear scaling for longer visibility
+              // Previous t^1.5 was making it vanish too skinny too fast
+              const scale = p.life * 0.8 
               p.ref.current.scale.setScalar(scale)
                
               if (p.life <= 0) {
