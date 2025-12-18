@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import React, { useRef, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -16,7 +16,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
 
   // --- Configuration ---
   const HEAD_SIZE = 0.04 
-  const SPEED = 0.8 
+  const SPEED = 0.4 // Reduced as requested (was 0.8)
   const START_DELAY = 1.0 
   const SPIRAL_TURNS = 1.5 
 
@@ -125,6 +125,9 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
   return (
     // Wrap in the Container that matches Galaxy Tilt/Rotation
     <group ref={container}>
+        {/* Dust Trail - Renders stationary particles spawned from head */}
+        <DustTrail target={group} texture={comaTexture} active={state.current.phase === 'active'} />
+        
         <group ref={group}>
             {/* Head Visuals Only */}
             <group>
@@ -150,6 +153,100 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
     </group>
   )
 }
+
+/**
+ * Particle System for Dust Trail
+ * Manages a pool of meshes that spawn at target position and fade out.
+ */
+function DustTrail({ target, texture, active }: { target: React.MutableRefObject<THREE.Group>, texture: THREE.Texture, active: boolean }) {
+    // Pool size
+    const COUNT = 60
+    
+    // Stable particle state pool
+    const particles = useMemo(() => new Array(COUNT).fill(0).map(() => ({
+       ref: React.createRef<THREE.Mesh>(),
+       life: 0,
+       active: false,
+       // Small random offset for "dust cloud" feel
+       offset: new THREE.Vector3(0, 0, 0) 
+    })), [])
+    
+    const cursor = useRef(0)
+    const spawnTimer = useRef(0)
+  
+    useFrame((_, delta) => {
+       // --- Spawning Logic ---
+       if (active && target.current) {
+           spawnTimer.current += delta
+           // Spawn rate: Every 0.03s (30ms) -> High density
+           if (spawnTimer.current > 0.03) {
+               spawnTimer.current = 0
+               
+               // Get next particle in pool
+               const p = particles[cursor.current]
+               
+               // Activate
+               p.active = true
+               p.life = 1.0
+               
+               // Calculate spawn position (World -> Local is tricky if parent moves, 
+               // but here DustTrail and Target are SIBLINGS in the same container.
+               // So we can just copy Target's local position!)
+               if (p.ref.current) {
+                   p.ref.current.position.copy(target.current.position)
+                   
+                   // Add random scatter (dust width)
+                   p.ref.current.position.x += (Math.random() - 0.5) * 0.3
+                   p.ref.current.position.y += (Math.random() - 0.5) * 0.3
+                   p.ref.current.position.z += (Math.random() - 0.5) * 0.1
+                   
+                   p.ref.current.scale.setScalar(Math.random() * 0.5 + 0.5) // Random start size
+                   p.ref.current.visible = true
+                   ;(p.ref.current.material as THREE.Material).opacity = 0.6 // Start semi-transparent
+               }
+               
+               cursor.current = (cursor.current + 1) % COUNT
+           }
+       }
+  
+       // --- Update Logic (for ALL particles, active or fading) ---
+       particles.forEach(p => {
+          if (!p.active) return
+          
+          if (p.ref.current) {
+              // Fade out
+              p.life -= delta * 0.8 // Lasts ~1.2s
+              
+              const mat = p.ref.current.material as THREE.Material
+              mat.opacity = p.life * 0.6 
+              
+              // Shrink slightly
+              p.ref.current.scale.setScalar(p.life * 0.8)
+               
+              if (p.life <= 0) {
+                  p.active = false
+                  p.ref.current.visible = false
+              }
+          }
+       })
+    })
+  
+    return (
+      <group>
+         {particles.map((_, i) => (
+            <mesh key={i} ref={particles[i].ref} visible={false}>
+               <planeGeometry args={[0.08, 0.08]} /> {/* Small dust particles */}
+               <meshBasicMaterial 
+                  map={texture} 
+                  transparent 
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+               />
+            </mesh>
+         ))}
+      </group>
+    )
+  }
 
 export default function Comets({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity: number }> }) {
   return (
