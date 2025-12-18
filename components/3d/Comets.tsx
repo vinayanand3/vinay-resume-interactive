@@ -178,7 +178,6 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
        if (active && target.current) {
            spawnTimer.current += delta
            // Continuous stream: Spawn every frame roughly (0.016s)
-           // User explicitly requested 60fps for high density
            if (spawnTimer.current > 0.016) {
                spawnTimer.current = 0
                
@@ -193,14 +192,20 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
                if (p.ref.current) {
                    p.ref.current.position.copy(target.current.position)
                    
-                   // Tighter scatter for "brushstroke" feel (less wide)
-                   p.ref.current.position.x += (Math.random() - 0.5) * 0.1
-                   p.ref.current.position.y += (Math.random() - 0.5) * 0.1
-                   p.ref.current.position.z += (Math.random() - 0.5) * 0.05
+                   // Dust Cloud Scatter: Much wider spread for volume
+                   // Was 0.1, increasing to 0.4 for a "cloud" width
+                   p.ref.current.position.x += (Math.random() - 0.5) * 0.4
+                   p.ref.current.position.y += (Math.random() - 0.5) * 0.4
+                   p.ref.current.position.z += (Math.random() - 0.5) * 0.2
                    
-                   p.ref.current.scale.setScalar(Math.random() * 0.4 + 0.6) // Initial size
+                   // Random Rotation for natural cloud look
+                   p.ref.current.rotation.z = Math.random() * Math.PI
+                   
+                   // Larger, softer particles
+                   p.ref.current.scale.setScalar(Math.random() * 0.8 + 0.5) 
+                   
                    p.ref.current.visible = true
-                   ;(p.ref.current.material as THREE.Material).opacity = 0.8 // Start very luminous
+                   ;(p.ref.current.material as THREE.Material).opacity = 0.4 // Lower opacity for diffuse cloud look
                }
                
                cursor.current = (cursor.current + 1) % COUNT
@@ -213,16 +218,16 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
           
           if (p.ref.current) {
               // Decay rate determines trail length
-              // 0.015 -> ~66 seconds life (Extremely long tail)
+              // 0.015 -> ~66 seconds life
               p.life -= delta * 0.015
               
               const mat = p.ref.current.material as THREE.Material
-              // Additive blending means opacity accumulates, so keep individual opacity controlled
-              mat.opacity = p.life * 0.6 
+              // Additive blending means opacity accumulates
+              mat.opacity = p.life * 0.4 
               
-              // Tapering Brushstroke: Non-linear scaling explicitly requested
-              // Creates a distinct "plume" that narrows faster at the end
-              const scale = Math.pow(p.life, 1.5) * 0.8 
+              // Tapering: Still shrink, but keep some volume
+              // Linear scale looks better for clouds than t^1.5 which pinches too fast
+              const scale = p.life * 0.8 
               p.ref.current.scale.setScalar(scale)
                
               if (p.life <= 0) {
