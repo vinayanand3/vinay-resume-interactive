@@ -1,5 +1,6 @@
 import { useRef, useMemo, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
 
 /**
@@ -10,47 +11,47 @@ import * as THREE from 'three'
  */
 function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity: number }> }) {
   const group = useRef<THREE.Group>(null!)
-  const meshRef = useRef<THREE.Mesh>(null!) // Ref for the coma plane to pulse/fade
+  const meshRef = useRef<THREE.Mesh>(null!) 
   const { viewport } = useThree()
 
   // --- Configuration ---
-  const HEAD_SIZE = 0.04 // Requested 0.5x of previous
-  const SPEED = 0.5 // Adjust for smooth motion
-  const START_DELAY = 1.5 // Seconds between respawns
+  const HEAD_SIZE = 0.04 
+  const TAIL_WIDTH = 1.5
+  const TAIL_LENGTH = 10
+  const SPEED = 0.5 
+  const START_DELAY = 1.5 
 
   // --- Assets ---
   // Texture for the Coma (Glowing Head)
   const comaTexture = useMemo(() => {
+    // ... (texture generation same)
     const canvas = document.createElement('canvas')
     canvas.width = 128
     canvas.height = 128
     const ctx = canvas.getContext('2d')!
-    // Radial Gradient: White Core -> Greenish Mid -> Bluish Edge -> Transparent
     const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
-    g.addColorStop(0, 'rgba(255, 255, 255, 1)')       // Core
-    g.addColorStop(0.2, 'rgba(200, 255, 220, 0.9)')   // Greenish-White
-    g.addColorStop(0.5, 'rgba(100, 200, 255, 0.3)')   // Bluish Haze
-    g.addColorStop(1, 'rgba(0, 0, 0, 0)')             // Fade
+    g.addColorStop(0, 'rgba(255, 255, 255, 1)')       
+    g.addColorStop(0.2, 'rgba(200, 255, 220, 0.9)')   
+    g.addColorStop(0.5, 'rgba(100, 200, 255, 0.3)')   
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)')             
     ctx.fillStyle = g
     ctx.fillRect(0, 0, 128, 128)
     return new THREE.CanvasTexture(canvas)
   }, [])
+  
+  // ... (Rest of state/logic stays almost the same, just ensuring correct context)
 
   // --- State ---
-  // We use a comprehensive state machine to manage the lifecycle and prevent artifacts
-  // Phases: 'waiting' -> 'spawning' (1 frame reset) -> 'active' (flying) -> 'impacting' (fading)
   const state = useRef({
     phase: 'waiting' as 'waiting' | 'spawning' | 'active' | 'impacting',
     timer: 0, 
     progress: 0,
-    warmup: 0 // Frame counter for spawning stability
+    warmup: 0 
   })
 
-  // Trail visibility toggle and ID to force fresh instance (memory wipe)
   const [trailState, setTrailState] = useState({ visible: false, id: 0 })
 
   // --- Path Calculations ---
-  // Start: Positioned roughly behind "Available for work" (Left column, slightly below center)
   const startPos = useMemo(() => new THREE.Vector3(-viewport.width / 3.2, -0.5, 0), [viewport])
   const endPos = useMemo(() => new THREE.Vector3(0, 0, 0), [])
   const controlPos = useMemo(() => new THREE.Vector3(-viewport.width / 8, -2, 2), [viewport])
@@ -69,12 +70,10 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
             s.warmup = 0 
             s.progress = 0
             
-            // Hard Reset Position
             group.current.position.copy(startPos)
             group.current.updateMatrixWorld(true)
             group.current.visible = true
             
-            // Reset opacity to 0 to hide any initial frame glitches
             if (meshRef.current) {
                 (meshRef.current.material as THREE.Material).opacity = 0;
             }
@@ -85,22 +84,17 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
         group.current.updateMatrixWorld(true)
         
         s.warmup += 1
-        // Keep warmup for stability of the Head mesh
         if (s.warmup > 5) {
             s.phase = 'active'
             s.progress = 0
-            
-            // NOTE: We do NOT enable the trail here anymore.
-            // We wait until the comet has started moving/fading in to enable it.
-            // This guarantees the Trail never 'sees' the teleportation frame.
-            
-            s.timer = 0 // use timer for fading in
+            // Trail NOT enabled here. Delayed.
+            s.timer = 0 
         }
     }
     else if (s.phase === 'active') {
         s.progress += delta * (SPEED * 0.5) 
         
-        // Fade in logic: Linear fade from 0 to 1 over first 0.5s
+        // Timer tracks time since active start
         if (s.timer < 1) {
             s.timer += delta * 2
             const opacity = Math.min(s.timer, 1)
@@ -108,9 +102,8 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
                 (meshRef.current.material as THREE.Material).opacity = opacity * 0.8;
             }
             
-            // TRIGGER TRAIL: Only enable trail after we have faded in slightly (approx 100ms)
-            // This ensures the Head is already moving and the "Teleport" is long gone.
-            if (s.timer > 0.2 && !trailState.visible) {
+            // DELAYED ENABLE: Wait 250ms (timer > 0.25) to be super safe
+            if (s.timer > 0.25 && !trailState.visible) {
                  setTrailState(prev => ({ visible: true, id: prev.id + 1 })) 
             }
         }
@@ -138,9 +131,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
 
   return (
     <group ref={group}>
-        {/* Tail Component */}
-        {/* Tail Component - DISABLED FOR DEBUGGING */}
-        {/*
+        {/* Tail Component - Re-enabled with strict checks */}
         {trailState.visible && (
             <Trail
                 key={trailState.id} 
@@ -155,7 +146,6 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
                 </mesh>
             </Trail>
         )}
-        */}
 
         {/* Head Visuals */}
         <group>
