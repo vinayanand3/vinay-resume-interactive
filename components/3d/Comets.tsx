@@ -1,6 +1,5 @@
 import { useRef, useMemo, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
 
 /**
@@ -16,8 +15,6 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
 
   // --- Configuration ---
   const HEAD_SIZE = 0.04 // Requested 0.5x of previous
-  const TAIL_WIDTH = 1.5
-  const TAIL_LENGTH = 10
   const SPEED = 0.5 // Adjust for smooth motion
   const START_DELAY = 1.5 // Seconds between respawns
 
@@ -142,6 +139,8 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
   return (
     <group ref={group}>
         {/* Tail Component */}
+        {/* Tail Component - DISABLED FOR DEBUGGING */}
+        {/*
         {trailState.visible && (
             <Trail
                 key={trailState.id} 
@@ -156,6 +155,7 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
                 </mesh>
             </Trail>
         )}
+        */}
 
         {/* Head Visuals */}
         <group>
