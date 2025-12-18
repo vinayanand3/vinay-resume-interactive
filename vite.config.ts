@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   // This is crucial for GitHub Pages. It must match your repository name.
   // Allow overriding for preview deploys (e.g. /vinay-resume/preview/)
-  base: process.env.VITE_BASE ?? '/vinay-resume/',
+  base: process.env.VITE_BASE ?? '/vinay-resume-interactive/',
   build: {
     rollupOptions: {
       output: {
