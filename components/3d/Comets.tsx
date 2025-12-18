@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
@@ -7,6 +7,9 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
   const group = useRef<THREE.Group>(null!)
   const meshRef = useRef<THREE.Mesh>(null!)
   const { viewport } = useThree()
+  
+  // Use state to force re-mounting of Trail to clear previous path
+  const [cometId, setCometId] = useState(0)
   
   // Path: Start (Top Left) -> End (Center)
   const startPos = new THREE.Vector3(-viewport.width / 2, viewport.height / 3, 0)
@@ -29,7 +32,7 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
     return new THREE.CanvasTexture(canvas)
   }, [])
 
-  // State in ref to avoid re-renders
+  // State in ref to avoid re-renders during animation
   const state = useRef({
     t: 0,
     speed: 0.3, // Speed of travel
@@ -52,8 +55,16 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
             s.opacity = 1
             // Reset position
             group.current.position.copy(startPos)
+            
+            // Trigger a re-render with new ID to clear the Trail
+            // Using a timeout to ensure it happens outside the render loop if possible, 
+            // or just calling it is fine as it schedules an update.
+            // We verify if we haven't already updated for this cycle? 
+            // Actually, simply setting it here works, but we need to ensure we don't spam.
+            // But this block only runs ONCE per cycle (when delay <= 0 triggers).
+            setCometId(prev => prev + 1)
         }
-        // Hide during delay
+        // Hide during delay so the trail doesn't render dots
         group.current.visible = false
     } else {
         group.current.visible = true
@@ -104,8 +115,9 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
 
   return (
     <group ref={group}>
-        {/* Tail */}
+        {/* Tail - Re-mounted on every cycle to clear glitch */}
         <Trail
+            key={cometId}
             width={2} // Reduced width
             length={8} 
             color={new THREE.Color('#a0c4ff')} 
