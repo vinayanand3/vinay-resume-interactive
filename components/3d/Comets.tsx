@@ -8,8 +8,8 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
   const meshRef = useRef<THREE.Mesh>(null!)
   const { viewport } = useThree()
   
-  // Use state to force re-mounting of Trail to clear previous path
-  const [cometId, setCometId] = useState(0)
+  // State to toggle Trail visibility to prevent artifacts
+  const [showTrail, setShowTrail] = useState(false)
   
   // Path: Start (Top Left) -> End (Center)
   const startPos = new THREE.Vector3(-viewport.width / 2, viewport.height / 3, 0)
@@ -49,26 +49,19 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
     
     if (s.phase === 'delay') {
         s.delay -= delta
+        
+        // Ensure position is reset continuously during delay (so it's ready)
+        group.current.position.copy(startPos)
+        group.current.visible = false
+        
         if (s.delay <= 0) {
             s.phase = 'flying'
             s.t = 0
             s.opacity = 1
-            // Reset position
-            group.current.position.copy(startPos)
-            
-            // Trigger a re-render with new ID to clear the Trail
-            // Using a timeout to ensure it happens outside the render loop if possible, 
-            // or just calling it is fine as it schedules an update.
-            // We verify if we haven't already updated for this cycle? 
-            // Actually, simply setting it here works, but we need to ensure we don't spam.
-            // But this block only runs ONCE per cycle (when delay <= 0 triggers).
-            setCometId(prev => prev + 1)
+            group.current.visible = true
+            setShowTrail(true) // Mount trail only when ready to fly
         }
-        // Hide during delay so the trail doesn't render dots
-        group.current.visible = false
-    } else {
-        group.current.visible = true
-    }
+    } 
 
     if (s.phase === 'flying') {
         s.t += delta * s.speed
@@ -100,9 +93,11 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
         
         // Fade out
         s.opacity -= delta * 2
+        
         if (s.opacity <= 0) {
            s.phase = 'delay'
            s.delay = Math.random() * 3 + 2 // Random delay before next comet
+           setShowTrail(false) // Unmount trail immediately on death
         }
     }
     
@@ -115,19 +110,20 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
 
   return (
     <group ref={group}>
-        {/* Tail - Re-mounted on every cycle to clear glitch */}
-        <Trail
-            key={cometId}
-            width={2} // Reduced width
-            length={8} 
-            color={new THREE.Color('#a0c4ff')} 
-            attenuation={(t) => t * t} 
-        >
-            <mesh>
-                <sphereGeometry args={[0.05, 16, 16]} />
-                <meshBasicMaterial color="#ffffff" transparent opacity={0} /> 
-            </mesh>
-        </Trail>
+        {/* Tail - Only render when flying/fading to avoid artifacts */}
+        {showTrail && (
+            <Trail
+                width={2} // Reduced width
+                length={8} 
+                color={new THREE.Color('#a0c4ff')} 
+                attenuation={(t) => t * t} 
+            >
+                <mesh>
+                    <sphereGeometry args={[0.05, 16, 16]} />
+                    <meshBasicMaterial color="#ffffff" transparent opacity={0} /> 
+                </mesh>
+            </Trail>
+        )}
 
         {/* Head Visuals */}
         <group rotation={[0, 0, Math.PI / 4]}>
