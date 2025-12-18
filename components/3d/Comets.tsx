@@ -45,18 +45,18 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
   const state = useRef({
     phase: 'waiting' as 'waiting' | 'spawning' | 'active' | 'impacting',
     timer: 0, 
-    progress: 0, // 0 to 1 along path
+    progress: 0,
+    warmup: 0 // Frame counter for spawning stability
   })
 
   // Trail visibility toggle and ID to force fresh instance (memory wipe)
   const [trailState, setTrailState] = useState({ visible: false, id: 0 })
 
   // --- Path Calculations ---
-  // Start: Right side, slightly upper
-  const startPos = useMemo(() => new THREE.Vector3(viewport.width / 2 + 2, viewport.height / 4, 0), [viewport])
+  // Start: Left side (Reverted)
+  const startPos = useMemo(() => new THREE.Vector3(-viewport.width / 2 - 2, viewport.height / 4, 0), [viewport])
   const endPos = useMemo(() => new THREE.Vector3(0, 0, 0), [])
-  // Control Point: Pulls the curve from the right
-  const controlPos = useMemo(() => new THREE.Vector3(viewport.width / 4, -2, 1), [viewport])
+  const controlPos = useMemo(() => new THREE.Vector3(-viewport.width / 4, -2, 1), [viewport])
 
   useFrame((_, delta) => {
     if (!group.current) return
@@ -69,21 +69,25 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
         
         if (s.timer <= 0) {
             s.phase = 'spawning'
+            s.warmup = 0 // Initialize warmup counter
             
             // Hard Reset Position
             group.current.position.copy(startPos)
             group.current.updateMatrixWorld(true)
             group.current.visible = true
-            
-            // Increment ID to force new Trail instance
-            // We set visible to true in the NEXT frame via state to be safe
         }
     } 
     else if (s.phase === 'spawning') {
-        // Wait one frame to let position settle
-        s.phase = 'active'
-        s.progress = 0
-        setTrailState(prev => ({ visible: true, id: prev.id + 1 })) // New Key = Fresh Memory
+        // Force Position Hold for 5 frames to guarantee stability
+        group.current.position.copy(startPos)
+        group.current.updateMatrixWorld(true)
+        
+        s.warmup += 1
+        if (s.warmup > 5) {
+            s.phase = 'active'
+            s.progress = 0
+            setTrailState(prev => ({ visible: true, id: prev.id + 1 })) 
+        }
     }
     else if (s.phase === 'active') {
         s.progress += delta * (SPEED * 0.5) 
