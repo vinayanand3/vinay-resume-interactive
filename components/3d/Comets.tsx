@@ -3,147 +3,168 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
 
-function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity: number }> }) {
+/**
+ * Single Comet Implementation
+ * Path: Starts from left (off-screen or overlapping timeline), curves into Milky Way Core.
+ * Visuals: Bright Nucleus, Greenish/Blue Coma, Long Fading Tail.
+ * Interaction: Flashes the core intensity ref upon impact.
+ */
+function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity: number }> }) {
   const group = useRef<THREE.Group>(null!)
-  const meshRef = useRef<THREE.Mesh>(null!)
+  const meshRef = useRef<THREE.Mesh>(null!) // Ref for the coma plane to pulse/fade
   const { viewport } = useThree()
-  
-  // State to toggle Trail visibility to prevent artifacts
-  const [showTrail, setShowTrail] = useState(false)
-  
-  // Path: Start (Left Edge, Upper Third) -> End (Center)
-  const startPos = new THREE.Vector3(-viewport.width / 2, viewport.height / 3, 0)
-  const endPos = new THREE.Vector3(0, 0, 0)
-  const controlPos = new THREE.Vector3(-viewport.width / 4, 0, 2) 
-  
-  // Create a radial gradient texture for the coma/glow
-  const glowTexture = useMemo(() => {
+
+  // --- Configuration ---
+  const HEAD_SIZE = 0.04 // Requested 0.5x of previous
+  const TAIL_WIDTH = 1.5
+  const TAIL_LENGTH = 10
+  const SPEED = 0.5 // Adjust for smooth motion
+  const START_DELAY = 1.5 // Seconds between respawns
+
+  // --- Assets ---
+  // Texture for the Coma (Glowing Head)
+  const comaTexture = useMemo(() => {
     const canvas = document.createElement('canvas')
-    canvas.width = 64
-    canvas.height = 64
-    const context = canvas.getContext('2d')!
-    const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32)
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)')
-    gradient.addColorStop(0.2, 'rgba(200, 255, 220, 0.8)') // Greenish tint
-    gradient.addColorStop(0.5, 'rgba(200, 255, 255, 0.2)') // Bluish fade
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
-    context.fillStyle = gradient
-    context.fillRect(0, 0, 64, 64)
+    canvas.width = 128
+    canvas.height = 128
+    const ctx = canvas.getContext('2d')!
+    // Radial Gradient: White Core -> Greenish Mid -> Bluish Edge -> Transparent
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+    g.addColorStop(0, 'rgba(255, 255, 255, 1)')       // Core
+    g.addColorStop(0.2, 'rgba(200, 255, 220, 0.9)')   // Greenish-White
+    g.addColorStop(0.5, 'rgba(100, 200, 255, 0.3)')   // Bluish Haze
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)')             // Fade
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, 128, 128)
     return new THREE.CanvasTexture(canvas)
   }, [])
 
-  // State in ref to avoid re-renders during animation
+  // --- State ---
+  // We use a comprehensive state machine to manage the lifecycle and prevent artifacts
+  // Phases: 'waiting' -> 'spawning' (1 frame reset) -> 'active' (flying) -> 'impacting' (fading)
   const state = useRef({
-    t: 0,
-    speed: 0.3, 
-    delay: 2, 
-    phase: 'delay' as 'delay' | 'spawning' | 'flying' | 'fading',
-    opacity: 1
+    phase: 'waiting' as 'waiting' | 'spawning' | 'active' | 'impacting',
+    timer: 0, 
+    progress: 0, // 0 to 1 along path
   })
+
+  // Trail visibility toggle (for glitch prevention)
+  const [trailVisible, setTrailVisible] = useState(false)
+
+  // --- Path Calculations ---
+  // Start: Left side, slightly upper
+  const startPos = useMemo(() => new THREE.Vector3(-viewport.width / 2 - 2, viewport.height / 4, 0), [viewport])
+  // End: Absolute Center (Core)
+  const endPos = useMemo(() => new THREE.Vector3(0, 0, 0), [])
+  // Control Point: Pulls the curve slightly downwards or outwards
+  const controlPos = useMemo(() => new THREE.Vector3(-viewport.width / 4, -2, 1), [viewport])
 
   useFrame((_, delta) => {
     if (!group.current) return
-    
-    // Update State
+
     const s = state.current
-    
-    if (s.phase === 'delay') {
-        s.delay -= delta
-        
-        // Keep forcing reset 
-        group.current.position.copy(startPos)
+
+    // --- Phase Logic ---
+
+    if (s.phase === 'waiting') {
+        s.timer -= delta
         group.current.visible = false
         
-        if (s.delay <= 0) {
-            // Move to spawning phase
+        if (s.timer <= 0) {
+            // Transition to Spawning
             s.phase = 'spawning'
-            group.current.visible = true
+            
+            // Hard Reset Position
             group.current.position.copy(startPos)
-            group.current.updateMatrixWorld(true) // FORCE MATRIX UPDATE
+            // Force Matrix Update to establish position in World Space
+            group.current.updateMatrixWorld(true)
+            
+            // Make visible but don't enable trail yet
+            group.current.visible = true
         }
-    } else if (s.phase === 'spawning') {
-        // Wait one frame
-        s.phase = 'flying'
-        s.t = 0
-        s.opacity = 1
-        setShowTrail(true) // Mount trail
-    } else {
-        group.current.visible = true
+    } 
+    else if (s.phase === 'spawning') {
+        // Hold for one frame to let position settle (prevents trail interpolation streak)
+        s.phase = 'active'
+        s.progress = 0
+        setTrailVisible(true) // Enable Trail
     }
-
-    if (s.phase === 'flying') {
-        s.t += delta * s.speed
+    else if (s.phase === 'active') {
+        // Move along Bezier Curve
+        s.progress += delta * (SPEED * 0.5) // Adjust speed scale
         
-        // Quadratic Bezier
-        const t = s.t
+        const t = s.progress
         const invT = 1 - t
         
-        group.current.position.x = invT * invT * startPos.x + 2 * invT * t * controlPos.x + t * t * endPos.x
-        group.current.position.y = invT * invT * startPos.y + 2 * invT * t * controlPos.y + t * t * endPos.y
-        group.current.position.z = invT * invT * startPos.z + 2 * invT * t * controlPos.z + t * t * endPos.z
+        // Quadratic Bezier Formula
+        // P = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
+        const x = (invT * invT * startPos.x) + (2 * invT * t * controlPos.x) + (t * t * endPos.x)
+        const y = (invT * invT * startPos.y) + (2 * invT * t * controlPos.y) + (t * t * endPos.y)
+        const z = (invT * invT * startPos.z) + (2 * invT * t * controlPos.z) + (t * t * endPos.z)
         
-        // Check arrival
-        if (s.t >= 1) {
-            s.phase = 'fading'
+        group.current.position.set(x, y, z)
+        
+        // Facing adjustment (optional, mostly for non-spherical heads)
+        // group.current.lookAt(endPos) 
+
+        // Check Impact
+        if (s.progress >= 1) {
+            s.phase = 'impacting'
+            
+            // TRIGGER CORE INTERACTION
             if (coreRef) {
-                coreRef.current.intensity = 1.0 
+                coreRef.current.intensity = 1.0 // Bright Flash
             }
         }
     }
-
-    if (s.phase === 'fading') {
-        // Continue moving slightly into the core
-        group.current.position.lerp(new THREE.Vector3(2, -1, -2), delta * 0.5)
+    else if (s.phase === 'impacting') {
+        // Disappear/Fade quickly
+        // We can just immediately reset for now, or fade opacity?
+        // Let's reset immediately to keep it sharp or small fade:
         
-        // Fade out
-        s.opacity -= delta * 2
-        if (s.opacity <= 0) {
-           s.phase = 'delay'
-           s.delay = Math.random() * 3 + 2 
-           setShowTrail(false) // Unmount trail
-        }
-    }
-    
-    if (meshRef.current) {
-        (meshRef.current.material as THREE.Material).opacity = s.opacity * 0.8;
+        setTrailVisible(false) // Cut trail immediately
+        s.phase = 'waiting'
+        s.timer = START_DELAY + Math.random() // Randomize next spawn slightly
+        
+        // Optional: continue motion slightly through core? 
+        // For "feeding" effect, maybe it just shrinks.
     }
   })
 
   return (
     <group ref={group}>
-        {/* Tail - Only render when flying/fading to avoid artifacts */}
-        {showTrail && (
+        {/* Tail Component */}
+        {trailVisible && (
             <Trail
-                width={2} 
-                length={8} 
-                color={new THREE.Color('#a0c4ff')} 
-                attenuation={(t) => t * t} 
+                width={TAIL_WIDTH}
+                length={TAIL_LENGTH}
+                color={new THREE.Color('#a0c4ff')} // Silvery Blue
+                attenuation={(t) => t * t} // Taper to nothing
             >
                 <mesh>
-                    <sphereGeometry args={[0.05, 16, 16]} />
-                    <meshBasicMaterial color="#ffffff" transparent opacity={0} /> 
+                    <sphereGeometry args={[HEAD_SIZE, 8, 8]} />
+                    <meshBasicMaterial visible={false} /> {/* Invisible mesh for trail anchor */}
                 </mesh>
             </Trail>
         )}
 
         {/* Head Visuals */}
-        <group rotation={[0, 0, Math.PI / 4]}>
-            {/* Solid Nucleus (Core) */}
+        <group>
+            {/* 1. The Solid Core (Nucleus) */}
             <mesh>
-                <sphereGeometry args={[0.04, 16, 16]} /> {/* Reduced head size */}
-                <meshBasicMaterial color="#ffffff" toneMapped={false} transparent opacity={state.current.opacity} />
+                <sphereGeometry args={[HEAD_SIZE, 16, 16]} />
+                <meshBasicMaterial color="#ffffff" toneMapped={false} />
             </mesh>
             
-            {/* Coma (Glow) */}
-            <mesh ref={meshRef} scale={[2, 2, 1]}> 
-                <planeGeometry args={[1, 1]} />
+            {/* 2. The Gaseous Coma (Glow) */}
+            <mesh ref={meshRef}>
+                <planeGeometry args={[HEAD_SIZE * 12, HEAD_SIZE * 12]} /> {/* Scaled up for glow */}
                 <meshBasicMaterial 
-                    map={glowTexture} 
-                    transparent 
-                    opacity={0.8} 
-                    depthWrite={false} 
+                    map={comaTexture}
+                    transparent
+                    opacity={0.8}
+                    depthWrite={false}
                     blending={THREE.AdditiveBlending}
-                    side={THREE.DoubleSide}
                 />
             </mesh>
         </group>
@@ -154,7 +175,7 @@ function CometInstance({ coreRef }: { coreRef?: React.MutableRefObject<{ intensi
 export default function Comets({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity: number }> }) {
   return (
     <group>
-       <CometInstance coreRef={coreRef} />
+        <SingleComet coreRef={coreRef} />
     </group>
   )
 }
