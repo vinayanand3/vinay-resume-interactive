@@ -177,8 +177,9 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
        // --- Spawning Logic ---
        if (active && target.current) {
            spawnTimer.current += delta
-           // Spawn rate: 0.02s (50fps) - fast enough for smooth line
-           if (spawnTimer.current > 0.02) {
+           // Continuous stream: Spawn every frame roughly (0.016s)
+           // User explicitly requested 60fps for high density
+           if (spawnTimer.current > 0.016) {
                spawnTimer.current = 0
                
                // Get next particle in pool
@@ -212,16 +213,16 @@ function DustTrail({ target, texture, active }: { target: React.MutableRefObject
           
           if (p.ref.current) {
               // Decay rate determines trail length
-              // 0.02 -> 50 seconds life (Matches pool capacity of 2500 @ 50Hz)
-              p.life -= delta * 0.02 
+              // 0.035 -> ~28 seconds life
+              p.life -= delta * 0.035
               
               const mat = p.ref.current.material as THREE.Material
               // Additive blending means opacity accumulates, so keep individual opacity controlled
               mat.opacity = p.life * 0.6 
               
-              // Tapering Brushstroke: Linear scaling for longer visibility
-              // Previous t^1.5 was making it vanish too skinny too fast
-              const scale = p.life * 0.8 
+              // Tapering Brushstroke: Non-linear scaling explicitly requested
+              // Creates a distinct "plume" that narrows faster at the end
+              const scale = Math.pow(p.life, 1.5) * 0.8 
               p.ref.current.scale.setScalar(scale)
                
               if (p.life <= 0) {
