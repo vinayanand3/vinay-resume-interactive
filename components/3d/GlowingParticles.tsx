@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-export default function GlowingParticles({ count = 10000 }: { count?: number }) {
+export default function GlowingParticles({ count = 10000, coreRef }: { count?: number, coreRef?: React.MutableRefObject<{ intensity: number }> }) {
   const mesh = useRef<THREE.Group>(null!)
   const { viewport, mouse } = useThree()
 
@@ -119,6 +119,14 @@ export default function GlowingParticles({ count = 10000 }: { count?: number }) 
     
     mesh.current.rotation.x += (desiredX - currentX) * 0.05
     mesh.current.rotation.y += (targetX * 0.05 - mesh.current.rotation.y) * 0.05
+
+    // Handle Core Flash
+    if (coreRef) {
+        coreRef.current.intensity = THREE.MathUtils.lerp(coreRef.current.intensity, 0, 0.02)
+        
+        dustMaterial.opacity = 0.6 + coreRef.current.intensity * 2
+        dustMaterial.size = 0.03 + coreRef.current.intensity * 0.05
+    }
   })
 
   return (
