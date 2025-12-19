@@ -86,7 +86,9 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
             // Initialize world position tracking
             group.current.getWorldPosition(s.currentWorldPosition)
             s.previousWorldPosition.copy(s.currentWorldPosition)
+            // Initialize with a small initial velocity for immediate tail alignment
             s.velocity.set(0, 0, 0)
+            headVelocityRef.current.set(0, 0, 0)
         }
     } 
     else if (s.phase === 'active') {
@@ -112,9 +114,25 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
         headWorldPositionRef.current.copy(s.currentWorldPosition)
         
         // Calculate velocity (world-space direction)
-        s.velocity.subVectors(s.currentWorldPosition, s.previousWorldPosition)
-        if (delta > 0) {
-            s.velocity.divideScalar(delta) // Convert to velocity per second
+        // On first frame, use estimated velocity based on spiral direction
+        const positionDelta = s.currentWorldPosition.distanceTo(s.previousWorldPosition)
+        if (positionDelta < 0.0001) {
+            // Estimate initial velocity from spiral direction for immediate tail alignment
+            const nextProgress = s.progress + delta * (SPEED * 0.3)
+            const nextR = s.startRadius * (1 - nextProgress)
+            const nextTheta = s.startAngle - (nextProgress * SPIRAL_TURNS * Math.PI * 2)
+            const nextX = nextR * Math.cos(nextTheta)
+            const nextY = nextR * Math.sin(nextTheta)
+            const estimatedVel = new THREE.Vector3(nextX - x, nextY - y, 0)
+            if (delta > 0) {
+                estimatedVel.divideScalar(delta)
+            }
+            s.velocity.copy(estimatedVel)
+        } else {
+            s.velocity.subVectors(s.currentWorldPosition, s.previousWorldPosition)
+            if (delta > 0) {
+                s.velocity.divideScalar(delta) // Convert to velocity per second
+            }
         }
         headVelocityRef.current.copy(s.velocity)
         
