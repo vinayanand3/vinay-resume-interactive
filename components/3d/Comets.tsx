@@ -401,7 +401,6 @@ function CometTail({
       positions[i * 3 + 2] = data.positions[i * 3 + 2]
       
       // Update opacity via color alpha (using color for additive blending)
-      const opacity = 1.0 - normalizedAge
       const fadeStart = 0.7
       const fadeOpacity = normalizedAge < fadeStart 
         ? 1.0 
