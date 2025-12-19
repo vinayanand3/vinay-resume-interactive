@@ -294,19 +294,25 @@ function CometTail({
   
   // Ensure buffer attributes use our ref arrays (geometry is created with them, but double-check)
   useEffect(() => {
-    if (pointsRef.current) {
-      const geom = pointsRef.current.geometry
-      const posAttr = geom.attributes.position as THREE.BufferAttribute
-      const colorAttr = geom.attributes.color as THREE.BufferAttribute
-      
-      // Ensure we're using our ref arrays
-      if (posAttr.array !== positionsRef.current) {
-        posAttr.array = positionsRef.current
+    // Use a small delay to ensure the points are mounted
+    const timer = setTimeout(() => {
+      if (pointsRef.current && pointsRef.current.geometry) {
+        const geom = pointsRef.current.geometry
+        const posAttr = geom.attributes.position as THREE.BufferAttribute
+        const colorAttr = geom.attributes.color as THREE.BufferAttribute
+        
+        if (posAttr && colorAttr) {
+          // Force set our ref arrays
+          posAttr.array = positionsRef.current
+          posAttr.needsUpdate = true
+          
+          colorAttr.array = colorsRef.current
+          colorAttr.needsUpdate = true
+        }
       }
-      if (colorAttr.array !== colorsRef.current) {
-        colorAttr.array = colorsRef.current
-      }
-    }
+    }, 0)
+    
+    return () => clearTimeout(timer)
   }, [])
   
   useFrame((_, delta) => {
@@ -456,22 +462,36 @@ function CometTail({
     }
     
     // Mark attributes as needing update - directly update buffer attribute arrays
-    if (pointsRef.current) {
+    if (pointsRef.current && pointsRef.current.geometry) {
       const geom = pointsRef.current.geometry
       const posAttr = geom.attributes.position as THREE.BufferAttribute
       const colorAttr = geom.attributes.color as THREE.BufferAttribute
       
-      // Directly update the buffer attribute arrays
-      const posArray = posAttr.array as Float32Array
-      const colorArray = colorAttr.array as Float32Array
-      
-      // Copy our updated data to the buffer attribute arrays
-      posArray.set(positions)
-      colorArray.set(colors)
-      
-      // Mark for update
-      posAttr.needsUpdate = true
-      colorAttr.needsUpdate = true
+      if (posAttr && colorAttr) {
+        // Ensure we're using our ref arrays (force update if needed)
+        if (posAttr.array !== positions) {
+          posAttr.array = positions
+        } else {
+          // Directly update the buffer attribute arrays
+          const posArray = posAttr.array as Float32Array
+          if (posArray && posArray.length === positions.length) {
+            posArray.set(positions)
+          }
+        }
+        
+        if (colorAttr.array !== colors) {
+          colorAttr.array = colors
+        } else {
+          const colorArray = colorAttr.array as Float32Array
+          if (colorArray && colorArray.length === colors.length) {
+            colorArray.set(colors)
+          }
+        }
+        
+        // Mark for update
+        posAttr.needsUpdate = true
+        colorAttr.needsUpdate = true
+      }
     }
   })
   
