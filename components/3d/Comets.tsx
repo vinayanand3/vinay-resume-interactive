@@ -133,8 +133,8 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
   const headMaterial = useMemo(() => {
     const material = new THREE.MeshStandardMaterial({
       color: new THREE.Color(0.9, 0.95, 1.0), // Pale icy white
-      emissive: new THREE.Color(0.2, 0.5, 0.8), // Blue-cyan emissive
-      emissiveIntensity: 1.5,
+      emissive: new THREE.Color(0.4, 0.7, 1.0), // Blue-cyan emissive (brighter)
+      emissiveIntensity: 3.0, // Increased for better visibility
       roughness: 0.3, // Low roughness for soft scattering
       metalness: 0.1, // Low metalness
       toneMapped: false
