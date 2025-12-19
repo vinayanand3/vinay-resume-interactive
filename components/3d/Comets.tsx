@@ -291,15 +291,12 @@ function CometTail({
       const posAttr = geom.attributes.position as THREE.BufferAttribute
       const colorAttr = geom.attributes.color as THREE.BufferAttribute
       
-      // Set the arrays to our refs to ensure they're the same reference
-      if (posAttr.array !== positionsRef.current) {
-        posAttr.array = positionsRef.current
-        posAttr.needsUpdate = true
-      }
-      if (colorAttr.array !== colorsRef.current) {
-        colorAttr.array = colorsRef.current
-        colorAttr.needsUpdate = true
-      }
+      // Replace the buffer attribute arrays with our refs to ensure same reference
+      posAttr.array = positionsRef.current
+      posAttr.needsUpdate = true
+      
+      colorAttr.array = colorsRef.current
+      colorAttr.needsUpdate = true
     }
   }, [])
   
