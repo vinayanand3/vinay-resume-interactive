@@ -159,6 +159,16 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
     })
     return material
   }, [])
+  
+  // Additional glow layer using MeshBasicMaterial for guaranteed visibility
+  const glowMaterial = useMemo(() => {
+    return new THREE.MeshBasicMaterial({
+      color: new THREE.Color(0.4, 0.7, 1.0), // Blue-cyan glow
+      transparent: true,
+      opacity: 0.6,
+      toneMapped: false
+    })
+  }, [])
 
   return (
     <>
@@ -176,6 +186,12 @@ function SingleComet({ coreRef }: { coreRef?: React.MutableRefObject<{ intensity
             <mesh ref={headMeshRef}>
                 <sphereGeometry args={[HEAD_SIZE, 32, 32]} />
                 <primitive object={headMaterial} attach="material" />
+            </mesh>
+            
+            {/* Additional Glow Layer for guaranteed visibility */}
+            <mesh>
+                <sphereGeometry args={[HEAD_SIZE * 1.2, 16, 16]} />
+                <primitive object={glowMaterial} attach="material" />
             </mesh>
             
             {/* Optional Point Light for Glow Illusion */}
