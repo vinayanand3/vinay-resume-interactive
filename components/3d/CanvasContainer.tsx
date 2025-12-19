@@ -12,7 +12,16 @@ export default function CanvasContainer({ children }: { children?: React.ReactNo
     <div className="fixed inset-0 z-0">
       <Canvas
         dpr={[1, 2]}
-        gl={{ antialias: false, alpha: false, stencil: false, depth: false }}
+        gl={{ 
+          antialias: false, 
+          alpha: false, 
+          stencil: false, 
+          depth: false,
+          powerPreference: "high-performance",
+          preserveDrawingBuffer: false,
+          // Explicitly request WebGL context
+          xr: false
+        }}
         camera={{ position: [0, 0, 15], fov: 45 }}
       >
         <color attach="background" args={['#050505']} />
