@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react'
+import React, { useRef, useMemo, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -284,6 +284,25 @@ function CometTail({
   const spawnTimer = useRef(0)
   const nextParticleIndex = useRef(0)
   
+  // Ensure buffer attributes are properly initialized with our ref arrays
+  useEffect(() => {
+    if (pointsRef.current) {
+      const geom = pointsRef.current.geometry
+      const posAttr = geom.attributes.position as THREE.BufferAttribute
+      const colorAttr = geom.attributes.color as THREE.BufferAttribute
+      
+      // Set the arrays to our refs to ensure they're the same reference
+      if (posAttr.array !== positionsRef.current) {
+        posAttr.array = positionsRef.current
+        posAttr.needsUpdate = true
+      }
+      if (colorAttr.array !== colorsRef.current) {
+        colorAttr.array = colorsRef.current
+        colorAttr.needsUpdate = true
+      }
+    }
+  }, [])
+  
   useFrame((_, delta) => {
     if (!pointsRef.current) return
     
@@ -430,11 +449,23 @@ function CometTail({
       
     }
     
-    // Mark attributes as needing update
+    // Mark attributes as needing update - directly update buffer attribute arrays
     if (pointsRef.current) {
       const geom = pointsRef.current.geometry
-      geom.attributes.position.needsUpdate = true
-      geom.attributes.color.needsUpdate = true
+      const posAttr = geom.attributes.position as THREE.BufferAttribute
+      const colorAttr = geom.attributes.color as THREE.BufferAttribute
+      
+      // Directly update the buffer attribute arrays
+      const posArray = posAttr.array as Float32Array
+      const colorArray = colorAttr.array as Float32Array
+      
+      // Copy our updated data to the buffer attribute arrays
+      posArray.set(positions)
+      colorArray.set(colors)
+      
+      // Mark for update
+      posAttr.needsUpdate = true
+      colorAttr.needsUpdate = true
     }
   })
   
