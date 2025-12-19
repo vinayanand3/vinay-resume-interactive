@@ -265,6 +265,14 @@ function CometTail({
     }
   }, [])
   
+  // Create geometry imperatively to ensure we control the array references
+  const geometry = useMemo(() => {
+    const geom = new THREE.BufferGeometry()
+    geom.setAttribute('position', new THREE.BufferAttribute(positionsRef.current, 3))
+    geom.setAttribute('color', new THREE.BufferAttribute(colorsRef.current, 3))
+    return geom
+  }, [])
+  
   const pointsRef = useRef<THREE.Points>(null!)
   
   // Material for points - larger size for visibility
@@ -284,19 +292,20 @@ function CometTail({
   const spawnTimer = useRef(0)
   const nextParticleIndex = useRef(0)
   
-  // Ensure buffer attributes are properly initialized with our ref arrays
+  // Ensure buffer attributes use our ref arrays (geometry is created with them, but double-check)
   useEffect(() => {
     if (pointsRef.current) {
       const geom = pointsRef.current.geometry
       const posAttr = geom.attributes.position as THREE.BufferAttribute
       const colorAttr = geom.attributes.color as THREE.BufferAttribute
       
-      // Replace the buffer attribute arrays with our refs to ensure same reference
-      posAttr.array = positionsRef.current
-      posAttr.needsUpdate = true
-      
-      colorAttr.array = colorsRef.current
-      colorAttr.needsUpdate = true
+      // Ensure we're using our ref arrays
+      if (posAttr.array !== positionsRef.current) {
+        posAttr.array = positionsRef.current
+      }
+      if (colorAttr.array !== colorsRef.current) {
+        colorAttr.array = colorsRef.current
+      }
     }
   }, [])
   
@@ -467,23 +476,7 @@ function CometTail({
   })
   
   return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={PARTICLE_COUNT}
-          array={positionsRef.current}
-          itemSize={3}
-        />
-        <bufferAttribute
-          attach="attributes-color"
-          count={PARTICLE_COUNT}
-          array={colorsRef.current}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <primitive object={material} attach="material" />
-    </points>
+    <points ref={pointsRef} geometry={geometry} material={material} />
   )
 }
 
